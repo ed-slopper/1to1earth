@@ -54,8 +54,10 @@ struct State {
     dragged: bool,
     /// The picture uploaded to the slot, and the view it shows.
     shown: Option<View>,
-    /// A finished picture waiting for upload.
-    ready: Option<(View, Vec<u8>)>,
+    /// Whether the shown picture has the land cover's lakes and rivers in it.
+    shown_water: bool,
+    /// A finished picture waiting for upload, and whether it has its water.
+    ready: Option<(View, bool, Vec<u8>)>,
     /// A picture is being drawn for this view.
     drawing: Option<View>,
     /// The map rect on screen, in GUI pixels, as last drawn.
@@ -75,6 +77,7 @@ fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {
         pressed: None,
         dragged: false,
         shown: None,
+        shown_water: false,
         ready: None,
         drawing: None,
         rect: [0.0; 4],
@@ -304,34 +307,61 @@ pub fn act(host: &mut dyn ClientHost) {
     if host.mod_screen() != Some(MOD_ID) {
         return;
     }
-    // Upload a finished picture; start the next when the view moved.
+    // Upload a finished picture; start the next when the view moved. A view is drawn twice when
+    // close enough for lakes: relief first (quick), then again with the land cover's water.
     let ready = with(|s| s.ready.take());
-    if let Some((view, rgba)) = ready {
+    if let Some((view, water, rgba)) = ready {
         if host.mod_image(view.w, view.h, &rgba) {
-            with(|s| s.shown = Some(view));
+            with(|s| {
+                s.shown = Some(view);
+                s.shown_water = water;
+            });
         }
     }
     let start = with(|s| {
         let want = s.view;
-        if s.drawing.is_some() || s.shown == Some(want) {
+        if s.drawing.is_some() || s.ready.is_some() {
             return None;
         }
+        let water = if s.shown != Some(want) {
+            false
+        } else if !s.shown_water && water_view(&want) {
+            true
+        } else {
+            return None;
+        };
         s.drawing = Some(want);
-        Some(want)
+        Some((want, water))
     });
-    if let Some(view) = start {
+    if let Some((view, water)) = start {
         std::thread::spawn(move || {
-            let rgba = picture(view);
+            let rgba = picture(view, water);
             with(|s| {
                 s.drawing = None;
-                s.ready = Some((view, rgba));
+                // A relief picture always shows (it is moved into place while dragging); a lakes
+                // pass for a view already left is dropped.
+                if !water || s.view == view {
+                    s.ready = Some((view, water, rgba));
+                }
             });
         });
     }
 }
 
+/// Texel size in metres at a view's middle.
+fn texel_metres(view: &View) -> f64 {
+    let (lat, _) = to_latlon(view.u, view.v);
+    40_075_016.0 * lat.to_radians().cos() / view.world()
+}
+
+/// Close enough to draw lakes from the land cover (texels under about 700 m): further out a view
+/// spans hundreds of the land cover's files.
+fn water_view(view: &View) -> bool {
+    texel_metres(view) < 700.0
+}
+
 /// The picture of `view`: shaded relief, sea in blues by depth.
-fn picture(view: View) -> Vec<u8> {
+fn picture(view: View, water: bool) -> Vec<u8> {
     let (w, h) = (view.w as i64, view.h as i64);
     let world = view.world();
     // The tile zoom whose pixels are about one picture texel (512-pixel tiles).
@@ -357,8 +387,18 @@ fn picture(view: View) -> Vec<u8> {
     }
     let g = |i: i64, j: i64| grid[((j + 1) * (w + 2) + i + 1) as usize];
     // Metres a texel, at the view's middle latitude, for the shading's slope.
-    let (lat, _) = to_latlon(view.u, view.v);
-    let texel_m = 40_075_016.0 * lat.to_radians().cos() / world;
+    let texel_m = texel_metres(&view);
+    // The land cover overview whose pixels are about a texel (10 m at overview 0).
+    let overview = ((texel_m / 10.0).log2().floor().max(0.0) as u32).min(crate::worldcover::MAX_OVERVIEW);
+    let u0w = view.u - w as f64 / 2.0 / world;
+    let v0w = view.v - h as f64 / 2.0 / world;
+    let wet = |i: i64, j: i64| -> bool {
+        if !water {
+            return false;
+        }
+        let (lat, lon) = to_latlon((u0w + (i as f64 + 0.5) / world).rem_euclid(1.0), v0w + (j as f64 + 0.5) / world);
+        crate::worldcover::class(lat, lon, overview) == crate::worldcover::WATER
+    };
     let mut out = vec![0u8; (w * h * 4) as usize];
     for j in 0..h {
         for i in 0..w {
@@ -366,6 +406,9 @@ fn picture(view: View) -> Vec<u8> {
             let o = ((j * w + i) * 4) as usize;
             let rgb = if e.is_nan() {
                 [27, 58, 92]
+            } else if e > 0.0 && wet(i, j) {
+                // A lake or river (the land cover's water above the sea).
+                [64, 122, 196]
             } else if e <= 0.0 {
                 let d = (-e / 6000.0).clamp(0.0, 1.0);
                 [

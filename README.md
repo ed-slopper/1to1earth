@@ -14,7 +14,8 @@ carvers and features finish it: caves, trees, grass, ores and snow.
   the Earth level's noise settings, because Horizon reads worldgen data from world datapacks, not
   from a mod's own data. Save and quit, open the world again, and you land on the Earth.
 - **Earth Map:** press Esc, then **Earth Map** at the pause screen's top left.
-  - The map is shaded relief of the whole planet, with sea in blue and a red dot where you are.
+  - The map is shaded relief of the whole planet, with the sea in blue and a red dot where you are.
+    Closer in, lakes and rivers from the ESA land cover appear a moment after the relief.
   - Drag to move it, scroll to zoom.
   - **Click a spot to go there:** the line under the map shows the `/earth tp` command for the spot
     under the pointer.

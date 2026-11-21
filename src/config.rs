@@ -25,6 +25,9 @@ pub struct Config {
     pub true_scale_latitude: f64,
     /// Where a player first arrives and `/earth` goes (default Everest, as Tellus).
     pub spawn: (f64, f64),
+    /// Buildings and roads from Overture Maps (at 4 m a block and finer).
+    pub buildings: bool,
+    pub roads: bool,
     /// Where the downloads are kept.
     pub cache: PathBuf,
 }
@@ -39,6 +42,8 @@ impl Default for Config {
             automatic_height_scaling: true,
             true_scale_latitude: 27.9881,
             spawn: (27.9881, 86.925),
+            buildings: true,
+            roads: true,
             cache: PathBuf::from("tellus").join("cache"),
         }
     }
@@ -89,6 +94,12 @@ fn load() -> Config {
                     .as_f64()
                     .filter(|l| l.abs() <= 80.0)
                     .unwrap_or(c.spawn.0.clamp(-80.0, 80.0));
+                if let Some(b) = v["buildings"].as_bool() {
+                    c.buildings = b;
+                }
+                if let Some(b) = v["roads"].as_bool() {
+                    c.roads = b;
+                }
                 if let Some(dir) = v["cache"].as_str() {
                     c.cache = PathBuf::from(dir);
                 }
@@ -105,6 +116,8 @@ fn load() -> Config {
                 "spawn_latitude": c.spawn.0,
                 "spawn_longitude": c.spawn.1,
                 "true_scale_latitude": c.true_scale_latitude,
+                "buildings": c.buildings,
+                "roads": c.roads,
                 "cache": c.cache.to_string_lossy(),
             }))
             .unwrap_or_default();

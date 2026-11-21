@@ -7,6 +7,7 @@
 //! `/earth` takes you there, `/earth tp <latitude> <longitude>` anywhere on it, `/earth where`
 //! says where you are and `/earth leave` takes you back to the Overworld.
 mod biome_table;
+mod city;
 mod config;
 mod datapack;
 mod earth;
@@ -14,6 +15,8 @@ mod elevation;
 mod fetch;
 mod koppen;
 mod map;
+mod mvt;
+mod pmtiles;
 mod worldcover;
 
 use mod_api::{
@@ -63,7 +66,7 @@ struct Mod;
 #[mod_api::horizon_mod]
 impl Hooks for Mod {
     fn register(&self, r: &mut dyn Registrar, _: &RegistrationContext) {
-        let keys = BLOCKS.iter().map(|n| (*n, r.block_key(n))).collect();
+        let keys = BLOCKS.iter().chain(city::BLOCKS).map(|n| (*n, r.block_key(n))).collect();
         r.register_chunk_generator("earth", Terrain { keys });
         r.register_biome_source("earth", Biomes);
         // The stack: one level per layer, all from the same generator (`earth::LAYERS`).
@@ -250,7 +253,17 @@ fn go(host: &mut dyn ServerHost, player: mod_api::PlayerRef, lat: f64, lon: f64)
     let (x, z) = earth::to_block(lat, lon);
     let (bx, bz) = (x.floor() as i32, z.floor() as i32);
     let c = earth::column(bx, bz);
-    let y = if c.wet() { c.water } else { c.ground } + 1;
+    let mut y = if c.wet() { c.water } else { c.ground } + 1;
+    // On top of whatever is built there (a roof, not inside a wall).
+    if !c.wet() {
+        if let Some(p) = city::Painter::for_chunk(bx.div_euclid(16) * 16, bz.div_euclid(16) * 16) {
+            p.column(bx, bz, c.ground, &mut |gy, name| {
+                if name != "minecraft:air" && gy >= y {
+                    y = gy + 1;
+                }
+            });
+        }
+    }
     // The layer that holds that height (`earth::SPAN`): Everest is two up, the trenches two down.
     let l = earth::layer_for(y);
     let local = y - l * earth::SPAN;
@@ -305,6 +318,7 @@ impl ChunkGenerator for Terrain {
             }
         }
         let at = |dx: i32, dz: i32| &cols[((dz + B) * W + dx + B) as usize];
+        let city = city::Painter::for_chunk(x0, z0);
         for dz in 0..16 {
             for dx in 0..16 {
                 let c = at(dx, dz);
@@ -345,6 +359,17 @@ impl ChunkGenerator for Terrain {
                     }
                     if biome.starts_with("minecraft:frozen") || biome == "minecraft:deep_frozen_ocean" {
                         chunk.set_block([x, c.water - off, z], ice);
+                    }
+                }
+                // Buildings and roads (Overture Maps), on dry ground.
+                if let Some(p) = &city {
+                    if !c.wet() {
+                        p.column(x, z, c.ground, &mut |gy, name| {
+                            let ly = gy - off;
+                            if (min_y..=max_y).contains(&ly) {
+                                chunk.set_block([x, ly, z], st(name));
+                            }
+                        });
                     }
                 }
             }

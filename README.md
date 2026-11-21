@@ -63,6 +63,26 @@ Vertically Stacked Dimensions).
     in the upper layers.
   - Each level saves its own blocks, so a build in the overlap is only in the layer it was made in.
 
+## Buildings and roads
+
+Like WorldCraft and Tellus, buildings and roads come from [Overture Maps](https://overturemaps.org)
+(OpenStreetMap and other open data, ODbL). Only the tiles a chunk needs are range-read from
+Overture's `buildings` and `transportation` PMTiles archives, at zoom 14. They're cached in
+`tellus\cache\overture`, and a world keeps the Overture release it first read.
+
+- **Buildings** stand on their real footprints at their mapped height. Where no height is mapped,
+  it comes from the floor count, or a typical height for the kind of building.
+  - Each has floors with lights in them, rows of windows, a foundation on slopes, and a flat roof
+    with a parapet, or a pitched roof on houses.
+  - Walls, windows and roofs are picked by kind (house, apartments, commercial or tall, industrial),
+    or by the mapped facade and roof colours where Overture has them.
+- **Roads** are painted at their class's width, from 16 m motorways to 2.5 m footpaths, with dashed
+  centre lines on main roads. Paths are dirt paths and rail lines gravel beds.
+- **Settings:** `buildings` and `roads` in `tellus.json` turn them off. They're only drawn at 4 m a
+  block or finer.
+- **Not yet:** bridges and tunnels, doors and interiors, building parts' own roof shapes, and street
+  furniture.
+
 ## What is ported
 
 | Part | Tellus source | Here |

@@ -18,7 +18,8 @@ mod worldcover;
 use mod_api::{
     BiomeSource, BlockKey, BlockState, ChunkAccess, ChunkGenerator, Command, CommandArgumentValue,
     CommandSource, DimensionSettings, Flow, Hooks, PlayerLoggedInEvent, RegisterCommandsEvent,
-    Registrar, RegistrationContext, RunModCommandEvent, ServerHost, Text, VanillaStages,
+    Registrar, RegistrationContext, RunModCommandEvent, ServerHost, ServerTickEvent, ServerTickPhase,
+    Text, VanillaStages,
 };
 use std::{cell::Cell, collections::HashMap};
 
@@ -59,19 +60,55 @@ impl Hooks for Mod {
         let keys = BLOCKS.iter().map(|n| (*n, r.block_key(n))).collect();
         r.register_chunk_generator("earth", Terrain { keys });
         r.register_biome_source("earth", Biomes);
-        r.register_dimension(
-            "earth",
-            DimensionSettings {
-                min_y: earth::MIN_Y,
-                height: earth::HEIGHT,
-                logical_height: earth::HEIGHT,
-                generator: "tellus:earth".into(),
-                noise_settings: "tellus:earth".into(),
-                mod_biome_source: Some("tellus:earth".into()),
-                sea_level: Some(earth::sea() + 1),
-                ..Default::default()
-            },
-        );
+        // The stack: one level per layer, all from the same generator (`earth::LAYERS`).
+        for l in earth::LAYERS {
+            let name = earth::layer_dim(l);
+            r.register_dimension(
+                name.trim_start_matches("tellus:"),
+                DimensionSettings {
+                    min_y: earth::MIN_Y,
+                    height: earth::HEIGHT,
+                    logical_height: earth::HEIGHT,
+                    generator: "tellus:earth".into(),
+                    noise_settings: "tellus:earth".into(),
+                    mod_biome_source: Some("tellus:earth".into()),
+                    sea_level: Some(earth::sea() + 1),
+                    // One cloud deck for the whole stack, at global Y 1,264 (about 1,200 m).
+                    cloud_height: Some((1264 - l * earth::SPAN) as f32),
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    fn server_tick(&self, host: &mut dyn ServerHost, event: &mut ServerTickEvent<'_>) {
+        if !matches!(event.phase, ServerTickPhase::ServerTickEnd { .. }) {
+            return;
+        }
+        // Players crossing a layer's edge go on to the next layer, where the same ground is.
+        for l in earth::LAYERS {
+            let Some(level) = host.level(&earth::layer_dim(l)) else { continue };
+            let Some(players) = level.online_players(host) else { continue };
+            for player in players {
+                let entity = player.entity();
+                let Some([x, y, z]) = entity.position(host) else { continue };
+                let to = if y > earth::CROSS as f64 && l < *earth::LAYERS.end() {
+                    l + 1
+                } else if y < -earth::CROSS as f64 && l > *earth::LAYERS.start() {
+                    l - 1
+                } else {
+                    continue;
+                };
+                let ny = y - ((to - l) * earth::SPAN) as f64;
+                let velocity = entity.velocity(host);
+                let rotation = entity.rotation(host);
+                if entity.teleport_to_level(host, &earth::layer_dim(to), [x, ny, z], rotation) {
+                    if let Some(v) = velocity {
+                        let _ = entity.set_velocity(host, v);
+                    }
+                }
+            }
+        }
     }
 
     fn register_commands(&self, _: &mut dyn ServerHost, event: &mut RegisterCommandsEvent<'_>) {
@@ -171,11 +208,20 @@ fn go(host: &mut dyn ServerHost, player: mod_api::PlayerRef, lat: f64, lon: f64)
     let (bx, bz) = (x.floor() as i32, z.floor() as i32);
     let c = earth::column(bx, bz);
     let y = if c.wet() { c.water } else { c.ground } + 1;
-    let ok = player
-        .entity()
-        .teleport_to_level(host, DIMENSION, [bx as f64 + 0.5, y as f64, bz as f64 + 0.5], None);
+    // The layer that holds that height (`earth::SPAN`): Everest is two up, the trenches two down.
+    let l = earth::layer_for(y);
+    let local = y - l * earth::SPAN;
+    let ok = player.entity().teleport_to_level(
+        host,
+        &earth::layer_dim(l),
+        [bx as f64 + 0.5, local as f64, bz as f64 + 0.5],
+        None,
+    );
     let line = if ok {
-        format!("{lat:.4}, {lon:.4}: block {bx} {y} {bz}, {:.0} m above the sea, Köppen {}.", c.metres, c.koppen)
+        format!(
+            "{lat:.4}, {lon:.4}: {:.0} m above the sea (Y {y} on the Earth, layer {l}: {bx} {local} {bz}), Köppen {}.",
+            c.metres, c.koppen
+        )
     } else {
         "The Earth didn't open. If this world is new to Tellus, save and quit, then open it again.".to_string()
     };
@@ -206,6 +252,9 @@ impl ChunkGenerator for Terrain {
         let (x0, z0) = (pos.x * 16, pos.z * 16);
         let min_y = chunk.min_y();
         let max_y = min_y + chunk.height() - 1;
+        // This chunk's layer of the stack: its blocks are global Y minus `off`.
+        let layer = earth::layer_of(chunk.level()).unwrap_or(0);
+        let off = layer * earth::SPAN;
         let mut cols = Vec::with_capacity((W * W) as usize);
         for dz in -B..16 + B {
             for dx in -B..16 + B {
@@ -216,6 +265,10 @@ impl ChunkGenerator for Terrain {
         for dz in 0..16 {
             for dx in 0..16 {
                 let c = at(dx, dz);
+                let top_here = if c.wet() { c.water } else { c.ground };
+                if top_here - off < min_y {
+                    continue; // all air in this layer
+                }
                 let slope = slope_at(&at, dx, dz);
                 let beach = !c.ocean && (-B..=B).any(|oz| (-B..=B).any(|ox| at(dx + ox, dz + oz).ocean));
                 let biome = earth::biome(c, slope);
@@ -224,9 +277,12 @@ impl ChunkGenerator for Terrain {
                 let top = st(if c.wet() { pal.wet_top } else { pal.top });
                 let filler = st(pal.filler);
                 let soil = c.ground - pal.depth;
-                for y in min_y..=c.ground.min(max_y) {
-                    let s = if y < min_y + 5
-                        && (y == min_y || earth::hash(x, y, z) % 5 < (min_y + 5 - y) as u32)
+                let bottom = layer == *earth::LAYERS.start();
+                for ly in min_y..=(c.ground - off).min(max_y) {
+                    let y = ly + off;
+                    let s = if bottom
+                        && ly < min_y + 5
+                        && (ly == min_y || earth::hash(x, ly, z) % 5 < (min_y + 5 - ly) as u32)
                     {
                         bedrock
                     } else if y == c.ground {
@@ -238,14 +294,14 @@ impl ChunkGenerator for Terrain {
                     } else {
                         stone
                     };
-                    chunk.set_block([x, y, z], s);
+                    chunk.set_block([x, ly, z], s);
                 }
                 if c.wet() {
-                    for y in c.ground + 1..=c.water.min(max_y) {
-                        chunk.set_block([x, y, z], water);
+                    for ly in (c.ground + 1 - off).max(min_y)..=(c.water - off).min(max_y) {
+                        chunk.set_block([x, ly, z], water);
                     }
                     if biome.starts_with("minecraft:frozen") || biome == "minecraft:deep_frozen_ocean" {
-                        chunk.set_block([x, c.water, z], ice);
+                        chunk.set_block([x, c.water - off, z], ice);
                     }
                 }
             }
@@ -253,7 +309,9 @@ impl ChunkGenerator for Terrain {
     }
 
     fn vanilla_stages(&self) -> VanillaStages {
-        VanillaStages { surface: false, carvers: true, structures: false, features: true }
+        // No vanilla carvers: they cut a fixed band of each level (about Y -64 to 180), which in the
+        // stack's upper layers is open sky, and fill it with their aquifer's lava and water.
+        VanillaStages { surface: false, carvers: false, structures: false, features: true }
     }
 }
 

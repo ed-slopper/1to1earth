@@ -50,42 +50,35 @@ fn mercator(lat: f64, lon: f64) -> (f64, f64) {
     (lon / 360.0 + 0.5, 0.5 - (PI / 4.0 + lat / 2.0).tan().ln() / (2.0 * PI))
 }
 
-/// Heights up to `KNEE` blocks above the sea (and depths to `DEEP_KNEE` below) are true; beyond
-/// them a logarithmic squeeze fits the rest under Horizon's ceiling and over its floor, so a high
-/// range keeps its shape instead of a flat cap (at 1:1: Rainier's 4,392 m ends near 1,770 blocks
-/// up, Everest's 8,848 m near 1,940; the deepest trench just above the floor).
-const KNEE: f64 = 1200.0;
-const DEEP_KNEE: f64 = 1500.0;
+/// The stack: Horizon's levels stop at Y 2031, so the Earth is layers of one level each, the
+/// way Java's stacked-dimension mods raise the height (Simply Stacked Dimensions, Vertically
+/// Stacked Dimensions). Layer `l` holds global Y `local + l * SPAN`. Each layer overlaps each
+/// neighbour by half, and a player passing `CROSS` from its middle moves on to the next, so
+/// there are always about a thousand blocks of the same world in view above and below.
+pub const SPAN: i32 = 2032;
+pub const CROSS: i32 = 1024; // a move lands 8 blocks past the next layer's middle line, inside its band
+pub const LAYERS: std::ops::RangeInclusive<i32> = -6..=6;
+/// The lowest and highest global ground the stack holds (about -14,200 to 14,200).
+pub const GLOBAL_MIN: i32 = MIN_Y - 6 * SPAN + 8;
+pub const GLOBAL_MAX: i32 = MAX_Y + 6 * SPAN - 24;
 
-/// `A` with `A * ln(1 + (v - knee) / A) == room`: the squeeze that takes `v` to the top of `room`.
-fn squeeze_for(v: f64, room: f64) -> Option<f64> {
-    if v <= room {
-        return None;
+/// The level id of layer `l`.
+pub fn layer_dim(l: i32) -> String {
+    match l {
+        0 => "tellus:earth".to_string(),
+        l if l > 0 => format!("tellus:earth_up{l}"),
+        l => format!("tellus:earth_down{}", -l),
     }
-    let f = |a: f64| a * (v / a).ln_1p() - room;
-    let (mut lo, mut hi) = (1e-3, room);
-    for _ in 0..80 {
-        let mid = 0.5 * (lo + hi);
-        if f(mid) > 0.0 { hi = mid } else { lo = mid }
-    }
-    Some(0.5 * (lo + hi))
 }
 
-fn squeeze(raw: f64) -> f64 {
-    static A: OnceLock<(Option<f64>, Option<f64>)> = OnceLock::new();
-    let (up, down) = *A.get_or_init(|| {
-        let s = config::get().scale();
-        let up_room = (MAX_Y - 24 - sea()) as f64 - KNEE;
-        let down_room = (sea() - (MIN_Y + 16)) as f64 - DEEP_KNEE;
-        (squeeze_for(9_500.0 / s - KNEE, up_room), squeeze_for(11_500.0 / s - DEEP_KNEE, down_room))
-    });
-    if raw > KNEE {
-        up.map_or(raw, |a| KNEE + a * ((raw - KNEE) / a).ln_1p())
-    } else if raw < -DEEP_KNEE {
-        down.map_or(raw, |a| -(DEEP_KNEE + a * ((-raw - DEEP_KNEE) / a).ln_1p()))
-    } else {
-        raw
-    }
+/// Which layer a level id is.
+pub fn layer_of(dim: &str) -> Option<i32> {
+    LAYERS.clone().find(|l| layer_dim(*l) == dim)
+}
+
+/// The layer whose own range holds global `y` best (nearest its middle).
+pub fn layer_for(y: i32) -> i32 {
+    ((y as f64) / SPAN as f64).round().clamp(*LAYERS.start() as f64, *LAYERS.end() as f64) as i32
 }
 
 /// Metres above (or below) the sea to blocks, as `TerrainHeightTransform` does.
@@ -93,7 +86,7 @@ fn blocks(m: f64, lat: f64) -> f64 {
     let c = config::get();
     let scale = if m >= 0.0 { c.terrestrial_height_scale } else { c.oceanic_height_scale };
     let corr = if c.automatic_height_scaling { 1.0 / lat.to_radians().cos().max(0.05) } else { 1.0 };
-    squeeze(m * scale * corr / c.scale())
+    m * scale * corr / c.scale()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -132,7 +125,7 @@ pub fn column(x: i32, z: i32) -> Column {
         let depth = elevation::sample(Dem::Sea, u, v, elevation::zoom_for(Dem::Sea, cfg.scale(), lat))
             .filter(|d| *d < 0.0)
             .unwrap_or(land.min(-1.0));
-        let floor = (sea_top + blocks(depth, lat).floor() as i32).min(sea_top - 1).max(MIN_Y + 8);
+        let floor = (sea_top + blocks(depth, lat).floor() as i32).min(sea_top - 1).max(GLOBAL_MIN);
         return Column { ground: floor, water: sea_top, ocean: true, cover, koppen, metres: depth, lat };
     }
     let top = if land >= 0.0 {
@@ -140,7 +133,7 @@ pub fn column(x: i32, z: i32) -> Column {
     } else {
         sea_top + blocks(land, lat).floor() as i32
     };
-    let top = top.clamp(MIN_Y + 8, MAX_Y - 24);
+    let top = top.clamp(GLOBAL_MIN, GLOBAL_MAX);
     if cover == wc::WATER {
         // A lake or river: its surface where the survey has it, its bed below. Water a block off
         // the sea's level is the sea's (harbours, lagoons, estuaries).

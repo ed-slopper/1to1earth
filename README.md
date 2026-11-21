@@ -3,7 +3,7 @@
 A port of [Tellus](https://github.com/Yucareux/Tellus) (Yucareux, LGPL-3.0), real-Earth terrain for
 Minecraft, to a [Horizon](https://github.com/horizon-rust/horizon) native mod in Rust.
 
-The Earth is a dimension of its own, `tellus:earth`, running from Y -2032 to 2031 (all of Horizon's height). Its terrain comes
+The Earth is a dimension of its own, `tellus:earth`, stacked 13 levels high so heights are true (see below). Its terrain comes
 from a registered chunk generator, and a registered biome source places its biomes. Vanilla's
 carvers and features finish it: caves, trees, grass, ores and snow.
 
@@ -34,16 +34,28 @@ carvers and features finish it: caves, trees, grass, ores and snow.
   `true_scale_latitude` is where a block is exactly `world_scale` metres, across and up. Mercator
   stretches the map by sec(latitude), so Tellus's 1:1 is only true at the equator.
 
-## Height at 1:1
+## Height: the stacked Earth
 
-Horizon's world is 4,064 blocks tall: Y -2032 to 2031, with the sea at 64.
+One Horizon level can't go past Y 2031: block positions store Y in 12 bits, and Horizon keeps the
+vanilla limit, as Java's height mods do (Beyond Y, World Height Limit). So the Earth is a **stack
+of 13 levels**, the way Java's stacked-dimension mods go higher (Simply Stacked Dimensions,
+Vertically Stacked Dimensions).
 
-| Ground | Height in the world |
-|---|---|
-| Up to 1,200 m above the sea | True |
-| Above 1,200 m | Squeezed logarithmically, so ranges keep their shape: Rainier (4,392 m) peaks near Y 1,890, Everest near Y 2,000 |
-| Up to 1,500 m below the sea | True |
-| Deeper than 1,500 m | Squeezed the same way, down to just above the floor |
+- **Layers:** `tellus:earth` is layer 0. Above it are `tellus:earth_up1` to `_up6`, below it
+  `tellus:earth_down1` to `_down6`. Each is a full Y -2032 to 2031 level.
+- **Heights:** layer `l` holds global Y `local + l * 2032`, so every height is true. Everest stands
+  at its full 8,848 m and the Mariana Trench at its full depth. The stack holds about Y -14,200 to
+  14,200.
+- **Overlap:** neighbouring layers overlap by half and carry the same terrain. Pass 1,024 blocks
+  above or below a layer's middle and you move to the next one at the same x and z, keeping your
+  speed. There are always about a thousand blocks of world in view above and below you.
+- **Teleporting:** `/earth tp` picks the right layer by itself.
+- **Clouds:** they sit at one real height, about 1,200 m, in every layer.
+- **Limits:**
+  - You can't see from one layer into the next, past about a thousand blocks.
+  - Vanilla's cave carvers are off, because they cut a fixed band of each level, which is open sky
+    in the upper layers.
+  - Each level saves its own blocks, so a build in the overlap is only in the layer it was made in.
 
 ## What is ported
 

@@ -13,6 +13,7 @@ mod earth;
 mod elevation;
 mod fetch;
 mod koppen;
+mod map;
 mod worldcover;
 
 use mod_api::{
@@ -20,6 +21,11 @@ use mod_api::{
     CommandSource, DimensionSettings, Flow, Hooks, PlayerLoggedInEvent, RegisterCommandsEvent,
     Registrar, RegistrationContext, RunModCommandEvent, ServerHost, ServerTickEvent, ServerTickPhase,
     Text, VanillaStages,
+};
+use mod_api::{
+    ClientHost, ClientTickPostEvent, MouseButtonPostEvent, ScreenMouseButtonPressedPreEvent,
+    ScreenMouseButtonReleasedPreEvent, ScreenMouseDraggedPreEvent, ScreenMouseScrolledPreEvent,
+    ScreenRenderPostEvent,
 };
 use std::{cell::Cell, collections::HashMap};
 
@@ -79,6 +85,43 @@ impl Hooks for Mod {
                 },
             );
         }
+    }
+
+    // --- the Earth map (map.rs) ---
+    fn screen_render_post(&self, host: &dyn ClientHost, event: &mut ScreenRenderPostEvent<'_>) {
+        map::draw(host, &mut *event.draw, event.screen);
+    }
+
+    fn screen_mouse_button_pressed_pre(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut ScreenMouseButtonPressedPreEvent<'_>,
+    ) -> Flow {
+        if map::pressed(host, event.screen, event.button) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn screen_mouse_button_released_pre(
+        &self,
+        host: &dyn ClientHost,
+        event: &mut ScreenMouseButtonReleasedPreEvent<'_>,
+    ) -> Flow {
+        if map::released(host, event.screen, event.button) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn screen_mouse_dragged_pre(&self, host: &dyn ClientHost, event: &mut ScreenMouseDraggedPreEvent<'_>) -> Flow {
+        if map::dragged(host, event.screen, event.delta) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn screen_mouse_scrolled_pre(&self, host: &dyn ClientHost, event: &mut ScreenMouseScrolledPreEvent<'_>) -> Flow {
+        if map::scrolled(host, event.screen, event.scroll[1]) { Flow::Cancel } else { Flow::Continue }
+    }
+
+    fn mouse_button_post(&self, host: &mut dyn ClientHost, _: &mut MouseButtonPostEvent) {
+        map::act(host);
+    }
+
+    fn client_tick_post(&self, host: &mut dyn ClientHost, _: &mut ClientTickPostEvent) {
+        map::act(host);
     }
 
     fn server_tick(&self, host: &mut dyn ServerHost, event: &mut ServerTickEvent<'_>) {

@@ -139,6 +139,20 @@ fn decode(dem: Dem, bytes: &[u8]) -> Option<Tile> {
     Some(Tile { size: w, h })
 }
 
+/// One pixel of `dem`'s tile pyramid at zoom `z` (`px`, `py` in that zoom's whole-world pixels),
+/// for the map screen: None while the tile can't be had or the source lacks it.
+pub fn pixel(dem: Dem, z: u8, px: i64, py: i64) -> Option<f32> {
+    let size = dem.size() as i64;
+    let total = size << z;
+    let (px, py) = (px.rem_euclid(total), py.clamp(0, total - 1));
+    let t = tile(dem, z, (px / size) as u32, (py / size) as u32)?;
+    if t.size == MISSING {
+        return None;
+    }
+    let (lx, ly) = ((px % size) as usize * t.size / size as usize, (py % size) as usize * t.size / size as usize);
+    t.h.get(ly * t.size + lx).copied()
+}
+
 /// The zoom whose pixels are about as wide as a block (Tellus's `selectZoom`), at most `max`.
 pub fn zoom_for(dem: Dem, metres_per_block: f64, lat: f64) -> u8 {
     let world = 40_075_016.686 * lat.to_radians().cos().max(0.01);

@@ -13,6 +13,11 @@ carvers and features finish it: caves, trees, grass, ores and snow.
 - **The first time in a new world**, the mod writes its datapack into the world. That datapack holds
   the Earth level's noise settings, because Horizon reads worldgen data from world datapacks, not
   from a mod's own data. Save and quit, open the world again, and you land on the Earth.
+- **Earth Map:** press Esc, then **Earth Map** at the pause screen's top left.
+  - The map is shaded relief of the whole planet, with sea in blue and a red dot where you are.
+  - Drag to move it, scroll to zoom.
+  - **Click a spot to go there:** the line under the map shows the `/earth tp` command for the spot
+    under the pointer.
 - Commands:
   - `/earth` goes to the spawn (Everest by default).
   - `/earth tp <latitude> <longitude>` goes anywhere (needs operator level 2 or cheats); pasted

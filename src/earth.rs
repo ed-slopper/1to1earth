@@ -10,11 +10,11 @@ use crate::{
 };
 use std::{collections::HashMap, f64::consts::PI, sync::OnceLock};
 
-/// The Earth level's build range: Y -1024 to 2031 (Horizon's top). Its noise settings,
-/// `tellus:earth`, come with the world's Tellus datapack, which the mod writes into the world
-/// (`datapack.rs`), so vanilla's carvers and features (trees, ores, grass) write over the whole range.
-pub const MIN_Y: i32 = -1024;
-pub const HEIGHT: i32 = 3056;
+/// The Earth level's build range: all of Horizon's, Y -2032 to 2031, so 1:1 fits what it can.
+/// Its noise settings, `tellus:earth`, come with the world's Tellus datapack, which the mod writes
+/// into the world (`datapack.rs`), so vanilla's carvers and features write over the whole range.
+pub const MIN_Y: i32 = -2032;
+pub const HEIGHT: i32 = 4064;
 pub const MAX_Y: i32 = MIN_Y + HEIGHT - 1;
 
 const METERS_PER_DEGREE: f64 = 111_319.490_666_666_67;
@@ -32,14 +32,14 @@ pub fn sea() -> i32 {
 /// Block `x, z` to latitude and longitude (Tellus's Mercator projection: lat 0, lon 0 at the
 /// origin, north toward -Z).
 pub fn to_globe(x: f64, z: f64) -> (f64, f64) {
-    let s = config::get().world_scale;
+    let s = config::get().scale();
     let lon = x * s / METERS_PER_DEGREE;
     let lat = (2.0 * (-z * s / radius()).exp().atan() - PI / 2.0).to_degrees();
     (lat, lon)
 }
 
 pub fn to_block(lat: f64, lon: f64) -> (f64, f64) {
-    let s = config::get().world_scale;
+    let s = config::get().scale();
     let lat = lat.clamp(-MAX_LAT, MAX_LAT).to_radians();
     (lon * METERS_PER_DEGREE / s, -radius() * (PI / 4.0 + lat / 2.0).tan().ln() / s)
 }
@@ -50,15 +50,42 @@ fn mercator(lat: f64, lon: f64) -> (f64, f64) {
     (lon / 360.0 + 0.5, 0.5 - (PI / 4.0 + lat / 2.0).tan().ln() / (2.0 * PI))
 }
 
-/// Ground above `KNEE` eased under the top of the world (only at scales finer than about 1:5), so
-/// the highest ranges keep their relief instead of a flat cap.
-const KNEE: i32 = MAX_Y - 240;
-fn ease_top(y: i32) -> i32 {
-    if y <= KNEE {
-        return y;
+/// Heights up to `KNEE` blocks above the sea (and depths to `DEEP_KNEE` below) are true; beyond
+/// them a logarithmic squeeze fits the rest under Horizon's ceiling and over its floor, so a high
+/// range keeps its shape instead of a flat cap (at 1:1: Rainier's 4,392 m ends near 1,770 blocks
+/// up, Everest's 8,848 m near 1,940; the deepest trench just above the floor).
+const KNEE: f64 = 1200.0;
+const DEEP_KNEE: f64 = 1500.0;
+
+/// `A` with `A * ln(1 + (v - knee) / A) == room`: the squeeze that takes `v` to the top of `room`.
+fn squeeze_for(v: f64, room: f64) -> Option<f64> {
+    if v <= room {
+        return None;
     }
-    let room = (MAX_Y - 24 - KNEE) as f64;
-    KNEE + (room * (1.0 - (-((y - KNEE) as f64) / room).exp())).round() as i32
+    let f = |a: f64| a * (v / a).ln_1p() - room;
+    let (mut lo, mut hi) = (1e-3, room);
+    for _ in 0..80 {
+        let mid = 0.5 * (lo + hi);
+        if f(mid) > 0.0 { hi = mid } else { lo = mid }
+    }
+    Some(0.5 * (lo + hi))
+}
+
+fn squeeze(raw: f64) -> f64 {
+    static A: OnceLock<(Option<f64>, Option<f64>)> = OnceLock::new();
+    let (up, down) = *A.get_or_init(|| {
+        let s = config::get().scale();
+        let up_room = (MAX_Y - 24 - sea()) as f64 - KNEE;
+        let down_room = (sea() - (MIN_Y + 16)) as f64 - DEEP_KNEE;
+        (squeeze_for(9_500.0 / s - KNEE, up_room), squeeze_for(11_500.0 / s - DEEP_KNEE, down_room))
+    });
+    if raw > KNEE {
+        up.map_or(raw, |a| KNEE + a * ((raw - KNEE) / a).ln_1p())
+    } else if raw < -DEEP_KNEE {
+        down.map_or(raw, |a| -(DEEP_KNEE + a * ((-raw - DEEP_KNEE) / a).ln_1p()))
+    } else {
+        raw
+    }
 }
 
 /// Metres above (or below) the sea to blocks, as `TerrainHeightTransform` does.
@@ -66,7 +93,7 @@ fn blocks(m: f64, lat: f64) -> f64 {
     let c = config::get();
     let scale = if m >= 0.0 { c.terrestrial_height_scale } else { c.oceanic_height_scale };
     let corr = if c.automatic_height_scaling { 1.0 / lat.to_radians().cos().max(0.05) } else { 1.0 };
-    m * scale * corr / c.world_scale
+    squeeze(m * scale * corr / c.scale())
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -92,9 +119,9 @@ pub fn column(x: i32, z: i32) -> Column {
     let cfg = config::get();
     let (lat, lon) = to_globe(x as f64 + 0.5, z as f64 + 0.5);
     let (u, v) = mercator(lat, lon);
-    let zoom = elevation::zoom_for(Dem::Land, cfg.world_scale, lat);
+    let zoom = elevation::zoom_for(Dem::Land, cfg.scale(), lat);
     let land = elevation::sample(Dem::Land, u, v, zoom).unwrap_or(0.0);
-    let overview = ((cfg.world_scale / 10.0).log2().floor().max(0.0) as u32).min(wc::MAX_OVERVIEW);
+    let overview = ((cfg.scale() / 10.0).log2().floor().max(0.0) as u32).min(wc::MAX_OVERVIEW);
     let cover = wc::class(lat, lon, overview);
     let koppen = koppen::code(lat, lon);
     let sea_top = sea();
@@ -102,7 +129,7 @@ pub fn column(x: i32, z: i32) -> Column {
         || cover == wc::WATER && land < 5.0
         || cover == wc::NO_DATA && land < -1.0;
     if is_sea {
-        let depth = elevation::sample(Dem::Sea, u, v, elevation::zoom_for(Dem::Sea, cfg.world_scale, lat))
+        let depth = elevation::sample(Dem::Sea, u, v, elevation::zoom_for(Dem::Sea, cfg.scale(), lat))
             .filter(|d| *d < 0.0)
             .unwrap_or(land.min(-1.0));
         let floor = (sea_top + blocks(depth, lat).floor() as i32).min(sea_top - 1).max(MIN_Y + 8);
@@ -113,7 +140,7 @@ pub fn column(x: i32, z: i32) -> Column {
     } else {
         sea_top + blocks(land, lat).floor() as i32
     };
-    let top = ease_top(top).max(MIN_Y + 8);
+    let top = top.clamp(MIN_Y + 8, MAX_Y - 24);
     if cover == wc::WATER {
         // A lake or river: its surface where the survey has it, its bed below. Water a block off
         // the sea's level is the sea's (harbours, lagoons, estuaries).

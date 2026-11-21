@@ -7,7 +7,8 @@ use std::{io::Cursor, sync::Arc};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Dem {
-    /// tiles.mapterhorn.com, land (and coarse sea), zoom up to 12 everywhere.
+    /// tiles.mapterhorn.com, land (and coarse sea): zoom 12 everywhere, finer (to 17) where its
+    /// surveys reach; a tile it lacks falls back to a coarser zoom.
     Land,
     /// tiles.openwaters.io seascape, the sea floor.
     Sea,
@@ -38,8 +39,8 @@ impl Dem {
     }
     fn max_zoom(self) -> u8 {
         match self {
-            Dem::Land => 12,
-            Dem::Sea => 12,
+            Dem::Land => 17,
+            Dem::Sea => 15,
             Dem::Aws => 15,
         }
     }

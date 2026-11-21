@@ -80,7 +80,7 @@ impl Hooks for Mod {
         event.commands.push(Command::new("earth leave"));
         event
             .commands
-            .push(Command::op("earth tp <latitude:number> <longitude:number>", 2));
+            .push(Command::op("earth tp <place:text>", 2));
     }
 
     fn run_mod_command(&self, host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>) -> Flow {
@@ -101,16 +101,22 @@ impl Hooks for Mod {
                 go(host, player, lat, lon);
             }
             Some("tp") => {
-                let num = |name| match command.argument(name) {
-                    Some(CommandArgumentValue::Number(v)) => Some(*v),
-                    _ => None,
+                // "47.47 -122.07", "47.47, -122.07" or "47.47,-122.07", as maps copy them.
+                let text = match command.argument("place") {
+                    Some(CommandArgumentValue::String(t)) => t.clone(),
+                    _ => String::new(),
                 };
-                let (Some(lat), Some(lon)) = (num("latitude"), num("longitude")) else {
-                    say(host, "Usage: /earth tp <latitude> <longitude>".into());
+                let nums: Vec<f64> = text
+                    .split(|c: char| c == ',' || c.is_whitespace())
+                    .filter(|w| !w.is_empty())
+                    .filter_map(|w| w.trim_end_matches(['°', 'N', 'E']).parse().ok())
+                    .collect();
+                let (Some(&lat), Some(&lon)) = (nums.first(), nums.get(1)) else {
+                    say(host, "Usage: /earth tp <latitude> <longitude>, e.g. /earth tp 47.4703, -122.0753".into());
                     return Flow::Cancel;
                 };
-                if lat.abs() > 84.0 || lon.abs() > 180.0 {
-                    say(host, "Latitude -84 to 84, longitude -180 to 180.".into());
+                if lat.abs() > 85.0 || lon.abs() > 180.0 {
+                    say(host, "Latitude -85 to 85, longitude -180 to 180.".into());
                     return Flow::Cancel;
                 }
                 go(host, player, lat, lon);

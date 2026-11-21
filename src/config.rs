@@ -9,7 +9,7 @@ use std::{path::PathBuf, sync::OnceLock};
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// Metres per block across (Tellus's `world_scale`, default 30).
+    /// Metres per block across (Tellus's `world_scale`; Tellus defaults to 30, this port to 1).
     pub world_scale: f64,
     /// Multipliers on land heights and sea depths (`terrestrial_height_scale`, `oceanic_height_scale`).
     pub terrestrial_height_scale: f64,
@@ -19,6 +19,10 @@ pub struct Config {
     /// Heights scaled by the projection's stretch at each latitude, so slopes keep their real
     /// steepness (`automatic_height_scaling`, default on).
     pub automatic_height_scaling: bool,
+    /// The latitude where the scale is true: a block is `world_scale` metres there, across and up
+    /// (Mercator stretches the map by sec(latitude), so 1:1 at the equator is 1:0.68 at 47 N).
+    /// Default: the spawn's latitude.
+    pub true_scale_latitude: f64,
     /// Where a player first arrives and `/earth` goes (default Everest, as Tellus).
     pub spawn: (f64, f64),
     /// Where the downloads are kept.
@@ -28,14 +32,23 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            world_scale: 30.0,
+            world_scale: 1.0,
             terrestrial_height_scale: 1.0,
             oceanic_height_scale: 1.0,
             height_offset: 64,
             automatic_height_scaling: true,
+            true_scale_latitude: 27.9881,
             spawn: (27.9881, 86.925),
             cache: PathBuf::from("tellus").join("cache"),
         }
+    }
+}
+
+impl Config {
+    /// Metres per block at the equator, as the projection takes it: `world_scale` made true at
+    /// `true_scale_latitude`.
+    pub fn scale(&self) -> f64 {
+        self.world_scale / self.true_scale_latitude.to_radians().cos()
     }
 }
 
@@ -72,6 +85,10 @@ fn load() -> Config {
                         c.spawn = (lat, lon);
                     }
                 }
+                c.true_scale_latitude = v["true_scale_latitude"]
+                    .as_f64()
+                    .filter(|l| l.abs() <= 80.0)
+                    .unwrap_or(c.spawn.0.clamp(-80.0, 80.0));
                 if let Some(dir) = v["cache"].as_str() {
                     c.cache = PathBuf::from(dir);
                 }
@@ -87,6 +104,7 @@ fn load() -> Config {
                 "automatic_height_scaling": c.automatic_height_scaling,
                 "spawn_latitude": c.spawn.0,
                 "spawn_longitude": c.spawn.1,
+                "true_scale_latitude": c.true_scale_latitude,
                 "cache": c.cache.to_string_lossy(),
             }))
             .unwrap_or_default();
@@ -94,8 +112,9 @@ fn load() -> Config {
         }
     }
     eprintln!(
-        "[tellus] 1:{} scale, heights x{} / x{}, sea at Y {}, spawn {:.4}, {:.4}, cache {}",
+        "[tellus] 1:{} scale (true at {:.2} N), heights x{} / x{}, sea at Y {}, spawn {:.4}, {:.4}, cache {}",
         c.world_scale,
+        c.true_scale_latitude,
         c.terrestrial_height_scale,
         c.oceanic_height_scale,
         c.height_offset,

@@ -3,7 +3,7 @@
 A port of [Tellus](https://github.com/Yucareux/Tellus) (Yucareux, LGPL-3.0), real-Earth terrain for
 Minecraft, to a [Horizon](https://github.com/horizon-rust/horizon) native mod in Rust.
 
-The Earth is a dimension of its own, `tellus:earth`, running from Y -1024 to 2031. Its terrain comes
+The Earth is a dimension of its own, `tellus:earth`, running from Y -2032 to 2031 (all of Horizon's height). Its terrain comes
 from a registered chunk generator, and a registered biome source places its biomes. Vanilla's
 carvers and features finish it: caves, trees, grass, ores and snow.
 
@@ -15,22 +15,35 @@ carvers and features finish it: caves, trees, grass, ores and snow.
   from a mod's own data. Save and quit, open the world again, and you land on the Earth.
 - Commands:
   - `/earth` goes to the spawn (Everest by default).
-  - `/earth tp <latitude> <longitude>` goes anywhere (needs operator level 2 or cheats).
+  - `/earth tp <latitude> <longitude>` goes anywhere (needs operator level 2 or cheats); pasted
+  map coordinates work too: `/earth tp 47.470256, -122.075310`.
   - `/earth where` tells you where you are.
   - `/earth leave` takes you back to the Overworld.
-- Settings are in `tellus.json`, in the instance folder (`%APPDATA%\horizon\instances\tellus`). They
-  use Tellus's names and defaults:
+- Settings are in `tellus.json`, in the instance folder (`%APPDATA%\horizon\instances	ellus`).
+  They use Tellus's names. Change them before generating a world.
 
   | Setting | Default |
   |---|---|
-  | `world_scale` | 30 metres per block |
-  | `terrestrial_height_scale` | 1 |
-  | `oceanic_height_scale` | 1 |
+  | `world_scale` | 1 (1:1; Tellus's own default is 30) |
+  | `true_scale_latitude` | the spawn's latitude |
+  | `terrestrial_height_scale`, `oceanic_height_scale` | 1 |
   | `height_offset` | 64 (sea level) |
   | `automatic_height_scaling` | on |
   | `spawn_latitude`, `spawn_longitude` | Everest |
 
-  Change them before generating a world.
+  `true_scale_latitude` is where a block is exactly `world_scale` metres, across and up. Mercator
+  stretches the map by sec(latitude), so Tellus's 1:1 is only true at the equator.
+
+## Height at 1:1
+
+Horizon's world is 4,064 blocks tall: Y -2032 to 2031, with the sea at 64.
+
+| Ground | Height in the world |
+|---|---|
+| Up to 1,200 m above the sea | True |
+| Above 1,200 m | Squeezed logarithmically, so ranges keep their shape: Rainier (4,392 m) peaks near Y 1,890, Everest near Y 2,000 |
+| Up to 1,500 m below the sea | True |
+| Deeper than 1,500 m | Squeezed the same way, down to just above the floor |
 
 ## What is ported
 

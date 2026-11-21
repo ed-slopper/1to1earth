@@ -49,7 +49,7 @@ so read the source first.
   map coordinates work too: `/earth tp 47.470256, -122.075310`.
   - `/earth where` tells you where you are.
   - `/earth leave` takes you back to the Overworld.
-- Settings are in `1to1earth.json`, in the instance folder (`%APPDATA%\horizon\instances\tellus`).
+- Settings are in `1to1earth.json`, in the instance's game folder.
   They use Tellus's names. Change them before generating a world.
 
   | Setting | Default |

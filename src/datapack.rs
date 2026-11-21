@@ -1,0 +1,50 @@
+//! The world's Tellus datapack: the Earth level's noise settings (`tellus:earth`, Y -1024 to 2031),
+//! which vanilla's carvers and features need over the level's whole height. Horizon reads worldgen
+//! data from a world's datapacks, not a mod's own data, so the mod writes the pack into each world
+//! it opens; a world that didn't have it yet takes it the next time it is opened.
+use std::path::Path;
+
+pub const NAME: &str = "tellus_earth";
+
+const MCMETA: &str = r#"{
+  "pack": {
+    "description": "Tellus: the Earth level's noise settings (Y -1024 to 2031)",
+    "min_format": 121,
+    "max_format": 121
+  }
+}
+"#;
+
+const NOISE_SETTINGS: &str = r#"{
+  "noise": {"min_y": -1024, "height": 3056},
+  "default_block": "minecraft:stone",
+  "default_fluid": "minecraft:water",
+  "noise_router": {
+    "chunk_surface_level": "minecraft:overworld/chunk_surface_level",
+    "continents": "minecraft:overworld/continents",
+    "depth": "minecraft:overworld/depth",
+    "erosion": "minecraft:overworld/erosion",
+    "final_density": "minecraft:overworld/final_density",
+    "ridges": "minecraft:overworld/ridges",
+    "temperature": "minecraft:overworld/temperature",
+    "vegetation": "minecraft:overworld/vegetation"
+  },
+  "material_rule": "minecraft:overworld",
+  "spawn_target": [],
+  "sea_level": 64,
+  "disable_mob_generation": false,
+  "legacy_random_source": false
+}
+"#;
+
+/// Make sure `world` has the pack. True when it was there already, so the open world has it.
+pub fn ensure(world: &Path) -> bool {
+    let dir = world.join("datapacks").join(NAME);
+    let file = dir.join("data/tellus/worldgen/noise_settings/earth.json");
+    let had = file.exists();
+    if !had || std::fs::read_to_string(&file).ok().as_deref() != Some(NOISE_SETTINGS) {
+        crate::fetch::write(&dir.join("pack.mcmeta"), MCMETA.as_bytes());
+        crate::fetch::write(&file, NOISE_SETTINGS.as_bytes());
+    }
+    had
+}

@@ -1,0 +1,14 @@
+id = "tellus"
+name = "Tellus for Horizon"
+version = "0.1.0"
+description = "The real Earth from geographic data, a port of Tellus (Yucareux) to Horizon: a dimension of its own, /earth to go there."
+authors = ["Yucareux (Tellus)", "Horizon port"]
+# A native mod: Rust in src/, compiled by the launcher against the game build [native] pins, beside data/ and assets/.
+api = "0.2"
+side = "both"
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "f037744a79f9982c47876f49c5a3067279f88706"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"

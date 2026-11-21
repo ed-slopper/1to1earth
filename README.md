@@ -19,7 +19,7 @@ carvers and features finish it: caves, trees, grass, ores and snow.
   map coordinates work too: `/earth tp 47.470256, -122.075310`.
   - `/earth where` tells you where you are.
   - `/earth leave` takes you back to the Overworld.
-- Settings are in `tellus.json`, in the instance folder (`%APPDATA%\horizon\instances	ellus`).
+- Settings are in `tellus.json`, in the instance folder (`%APPDATA%\horizon\instances\tellus`).
   They use Tellus's names. Change them before generating a world.
 
   | Setting | Default |

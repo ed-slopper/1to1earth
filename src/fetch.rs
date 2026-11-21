@@ -36,7 +36,7 @@ fn get_now(url: &str, range: Option<(u64, u64)>) -> Result<Option<Vec<u8>>, Stri
             std::thread::sleep(Duration::from_millis(500 << attempt));
         }
         let mut cmd = std::process::Command::new("curl");
-        cmd.args(["-sS", "-L", "--connect-timeout", "15", "--max-time", "120", "-A", "1to1earth/0.1"]);
+        cmd.args(["-sS", "-L", "--connect-timeout", "15", "--max-time", "120", "-A", "1to1earth/0.2 (+https://github.com/ed-slopper/1to1earth)"]);
         cmd.args(["-w", "\n%{http_code}"]);
         if let Some((a, b)) = range {
             cmd.args(["-r", &format!("{a}-{b}")]);

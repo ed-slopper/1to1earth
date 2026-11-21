@@ -45,8 +45,12 @@ so read the source first.
     under the pointer.
 - Commands:
   - `/earth` goes to the spawn (Everest by default).
-  - `/earth tp <latitude> <longitude>` goes anywhere (needs operator level 2 or cheats); pasted
-  map coordinates work too: `/earth tp 47.470256, -122.075310`.
+  - `/earth tp <latitude> <longitude>` goes anywhere (needs operator level 2 or cheats). Pasted
+    map coordinates work too: `/earth tp 47.470256, -122.075310`.
+  - `/earth tp <address or place>` looks it up with OpenStreetMap's
+    [Nominatim](https://nominatim.org) and goes there: `/earth tp Space Needle, Seattle`,
+    `/earth tp 1600 Pennsylvania Ave, Washington DC`. Lookups are kept to one a second, as
+    Nominatim asks, and you land on top of whatever is built there.
   - `/earth where` tells you where you are.
   - `/earth leave` takes you back to the Overworld.
 - Settings are in `1to1earth.json`, in the instance's game folder.

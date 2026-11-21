@@ -13,6 +13,7 @@ mod datapack;
 mod earth;
 mod elevation;
 mod fetch;
+mod geocode;
 mod koppen;
 mod map;
 mod mvt;
@@ -131,6 +132,19 @@ impl Hooks for Mod {
         if !matches!(event.phase, ServerTickPhase::ServerTickEnd { .. }) {
             return;
         }
+        // Places looked up for /earth tp <address>.
+        for a in geocode::answers() {
+            let Some(player) = host.player(a.player) else { continue };
+            match a.place {
+                Ok((lat, lon, name)) => {
+                    let _ = player.tell(host, Text::literal(format!("{name}")));
+                    go(host, player, lat, lon);
+                }
+                Err(why) => {
+                    let _ = player.tell(host, Text::literal(format!("{}: {why}.", a.query)));
+                }
+            }
+        }
         // Players crossing a layer's edge go on to the next layer, where the same ground is.
         for l in earth::LAYERS {
             let Some(level) = host.level(&earth::layer_dim(l)) else { continue };
@@ -184,25 +198,29 @@ impl Hooks for Mod {
                 go(host, player, lat, lon);
             }
             Some("tp") => {
-                // "47.47 -122.07", "47.47, -122.07" or "47.47,-122.07", as maps copy them.
+                // "47.47 -122.07", "47.47, -122.07" or "47.47,-122.07", as maps copy them; anything
+                // else is a place to look up: "Space Needle", "1600 Pennsylvania Ave, Washington".
                 let text = match command.argument("place") {
-                    Some(CommandArgumentValue::String(t)) => t.clone(),
+                    Some(CommandArgumentValue::String(t)) => t.trim().to_string(),
                     _ => String::new(),
                 };
-                let nums: Vec<f64> = text
-                    .split(|c: char| c == ',' || c.is_whitespace())
-                    .filter(|w| !w.is_empty())
-                    .filter_map(|w| w.trim_end_matches(['°', 'N', 'E']).parse().ok())
-                    .collect();
-                let (Some(&lat), Some(&lon)) = (nums.first(), nums.get(1)) else {
-                    say(host, "Usage: /earth tp <latitude> <longitude>, e.g. /earth tp 47.4703, -122.0753".into());
-                    return Flow::Cancel;
-                };
-                if lat.abs() > 85.0 || lon.abs() > 180.0 {
-                    say(host, "Latitude -85 to 85, longitude -180 to 180.".into());
-                    return Flow::Cancel;
+                let words: Vec<&str> =
+                    text.split(|c: char| c == ',' || c.is_whitespace()).filter(|w| !w.is_empty()).collect();
+                let nums: Vec<f64> =
+                    words.iter().filter_map(|w| w.trim_end_matches(['°', 'N', 'E']).parse().ok()).collect();
+                if words.len() == 2 && nums.len() == 2 {
+                    let (lat, lon) = (nums[0], nums[1]);
+                    if lat.abs() > 85.0 || lon.abs() > 180.0 {
+                        say(host, "Latitude -85 to 85, longitude -180 to 180.".into());
+                        return Flow::Cancel;
+                    }
+                    go(host, player, lat, lon);
+                } else if text.is_empty() {
+                    say(host, "Usage: /earth tp <latitude> <longitude>, or /earth tp <address or place>".into());
+                } else {
+                    say(host, format!("Looking up {text}..."));
+                    geocode::start(player.uuid(), text);
                 }
-                go(host, player, lat, lon);
             }
             Some("where") => {
                 let [x, _, z] = command.position;

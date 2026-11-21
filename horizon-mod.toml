@@ -1,6 +1,6 @@
 id = "1to1earth"
 name = "1to1earth"
-version = "0.1.0"
+version = "0.2.0"
 description = "The real Earth at 1:1 scale: true heights, land cover, climate, buildings and roads, in a stacked dimension of its own. /earth to go there, Esc > Earth Map to pick a place. A port of Tellus (Yucareux)."
 authors = ["Yucareux (Tellus)", "Horizon port"]
 # A native mod: Rust in src/, compiled by the launcher against the game build [native] pins, beside data/ and assets/.

@@ -1,5 +1,5 @@
-//! Tellus for Horizon: the real Earth from geographic data, a port of Tellus's terrain (Yucareux,
-//! LGPL-3.0) to a Horizon native mod, in a dimension of its own, `tellus:earth`. A registered chunk
+//! 1to1earth: the real Earth at 1:1 in Horizon, from geographic data: a port of Tellus's terrain (Yucareux,
+//! LGPL-3.0) to a Horizon native mod, in a dimension of its own, `1to1earth:earth`. A registered chunk
 //! generator builds the terrain from Mapterhorn elevation, ESA WorldCover land cover and the
 //! Köppen climate map, a registered biome source places Tellus's biomes, and vanilla's carvers
 //! and features (caves, trees, grass, ores, snow) finish it.
@@ -32,7 +32,7 @@ use mod_api::{
 };
 use std::{cell::Cell, collections::HashMap};
 
-pub const DIMENSION: &str = "tellus:earth";
+pub const DIMENSION: &str = "1to1earth:earth";
 
 /// Every block the generator writes.
 const BLOCKS: &[&str] = &[
@@ -73,14 +73,14 @@ impl Hooks for Mod {
         for l in earth::LAYERS {
             let name = earth::layer_dim(l);
             r.register_dimension(
-                name.trim_start_matches("tellus:"),
+                name.trim_start_matches("1to1earth:"),
                 DimensionSettings {
                     min_y: earth::MIN_Y,
                     height: earth::HEIGHT,
                     logical_height: earth::HEIGHT,
-                    generator: "tellus:earth".into(),
-                    noise_settings: "tellus:earth".into(),
-                    mod_biome_source: Some("tellus:earth".into()),
+                    generator: "1to1earth:earth".into(),
+                    noise_settings: "1to1earth:earth".into(),
+                    mod_biome_source: Some("1to1earth:earth".into()),
                     sea_level: Some(earth::sea() + 1),
                     // One cloud deck for the whole stack, at global Y 1,264 (about 1,200 m).
                     cloud_height: Some((1264 - l * earth::SPAN) as f32),
@@ -229,12 +229,12 @@ impl Hooks for Mod {
         if !datapack::ensure(&world) {
             let _ = player.tell(
                 host,
-                Text::literal("Tellus added its datapack to this world. Save and quit, then open the world again to go to the Earth (/earth)."),
+                Text::literal("1to1earth added its datapack to this world. Save and quit, then open the world again to go to the Earth (/earth)."),
             );
             return;
         }
         // A player's first time in this world: straight onto the Earth, at the spawn.
-        let marker = world.join("tellus").join("visited").join(format!("{:032x}", event.player));
+        let marker = world.join("1to1earth").join("visited").join(format!("{:032x}", event.player));
         if marker.exists() {
             return;
         }
@@ -279,7 +279,7 @@ fn go(host: &mut dyn ServerHost, player: mod_api::PlayerRef, lat: f64, lon: f64)
             c.metres, c.koppen
         )
     } else {
-        "The Earth didn't open. If this world is new to Tellus, save and quit, then open it again.".to_string()
+        "The Earth didn't open. If this world is new to 1to1earth, save and quit, then open it again.".to_string()
     };
     let _ = player.tell(host, Text::literal(line));
 }

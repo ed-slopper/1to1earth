@@ -15,7 +15,7 @@ use std::{
     sync::Mutex,
 };
 
-pub const MOD_ID: &str = "tellus";
+pub const MOD_ID: &str = "1to1earth";
 /// The image slot every client mod shares (Horizon's `MOD_IMAGE_SPRITE`, 1024 x 1024).
 const SPRITE: &str = "horizon/modimage";
 const SLOT: u32 = 1024;
@@ -301,7 +301,7 @@ pub fn act(host: &mut dyn ClientHost) {
     if let Some((lat, lon)) = go {
         host.mod_screen_close(MOD_ID);
         if let Err(e) = host.send_chat(&format!("/earth tp {lat:.6} {lon:.6}")) {
-            eprintln!("[tellus] map teleport: {e}");
+            eprintln!("[1to1earth] map teleport: {e}");
         }
     }
     if host.mod_screen() != Some(MOD_ID) {

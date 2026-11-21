@@ -114,12 +114,12 @@ fn header(square: u64, south: i32, west: i32) -> Option<Arc<Option<Header>>> {
                     }
                     Err(Short) if size < (4 << 20) && bytes.len() as u64 >= size => size *= 4,
                     Err(_) => {
-                        eprintln!("[tellus] land cover header {n} is unreadable");
+                        eprintln!("[1to1earth] land cover header {n} is unreadable");
                         return Some(Arc::new(None));
                     }
                 },
                 Err(e) => {
-                    eprintln!("[tellus] land cover header {n}: {e}");
+                    eprintln!("[1to1earth] land cover header {n}: {e}");
                     return None;
                 }
             }
@@ -156,7 +156,7 @@ fn read_block(h: &Header, level: &Level, south: i32, west: i32, overview: u32, i
         }
         Ok(_) => Some(Vec::new()),
         Err(e) => {
-            eprintln!("[tellus] land cover block {n}/{overview}/{index}: {e}");
+            eprintln!("[1to1earth] land cover block {n}/{overview}/{index}: {e}");
             None
         }
     }

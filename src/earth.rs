@@ -11,7 +11,7 @@ use crate::{
 use std::{collections::HashMap, f64::consts::PI, sync::OnceLock};
 
 /// The Earth level's build range: all of Horizon's, Y -2032 to 2031, so 1:1 fits what it can.
-/// Its noise settings, `tellus:earth`, come with the world's Tellus datapack, which the mod writes
+/// Its noise settings, `1to1earth:earth`, come with the world's 1to1earth datapack, which the mod writes
 /// into the world (`datapack.rs`), so vanilla's carvers and features write over the whole range.
 pub const MIN_Y: i32 = -2032;
 pub const HEIGHT: i32 = 4064;
@@ -65,9 +65,9 @@ pub const GLOBAL_MAX: i32 = MAX_Y + 6 * SPAN - 24;
 /// The level id of layer `l`.
 pub fn layer_dim(l: i32) -> String {
     match l {
-        0 => "tellus:earth".to_string(),
-        l if l > 0 => format!("tellus:earth_up{l}"),
-        l => format!("tellus:earth_down{}", -l),
+        0 => "1to1earth:earth".to_string(),
+        l if l > 0 => format!("1to1earth:earth_up{l}"),
+        l => format!("1to1earth:earth_down{}", -l),
     }
 }
 

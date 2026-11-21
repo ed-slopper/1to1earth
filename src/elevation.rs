@@ -93,7 +93,7 @@ fn load(dem: Dem, z: u8, x: u32, y: u32) -> Option<Tile> {
                 Some(t)
             }
             None => {
-                eprintln!("[tellus] {} tile {z}/{x}/{y} didn't decode", dem.dir());
+                eprintln!("[1to1earth] {} tile {z}/{x}/{y} didn't decode", dem.dir());
                 Some(Tile { size: MISSING, h: Vec::new() })
             }
         },
@@ -102,7 +102,7 @@ fn load(dem: Dem, z: u8, x: u32, y: u32) -> Option<Tile> {
             Some(Tile { size: MISSING, h: Vec::new() })
         }
         Err(e) => {
-            eprintln!("[tellus] {e}");
+            eprintln!("[1to1earth] {e}");
             None
         }
     }

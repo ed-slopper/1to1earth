@@ -1,8 +1,8 @@
 //! The world's settings, with Tellus's defaults (`EarthGeneratorSettings`): the world scale in
 //! metres per block, the height scales and offset, and where `/earth` takes a new player.
 //!
-//! Read once from `tellus.json` in the game's folder (the server's on a dedicated server), or the
-//! file `TELLUS_CONFIG` names. A missing file is written with the defaults so it can be edited.
+//! Read once from `1to1earth.json` in the game's folder (the server's on a dedicated server), or the
+//! file `EARTH_1TO1_CONFIG` names. A missing file is written with the defaults so it can be edited.
 //! Change the scale before a world is made: chunks already generated keep the old one.
 use mod_api::serde_json::{self, Value, json};
 use std::{path::PathBuf, sync::OnceLock};
@@ -44,7 +44,7 @@ impl Default for Config {
             spawn: (27.9881, 86.925),
             buildings: true,
             roads: true,
-            cache: PathBuf::from("tellus").join("cache"),
+            cache: PathBuf::from("1to1earth").join("cache"),
         }
     }
 }
@@ -64,9 +64,9 @@ pub fn get() -> &'static Config {
 
 fn load() -> Config {
     let mut c = Config::default();
-    let path = std::env::var_os("TELLUS_CONFIG")
+    let path = std::env::var_os("EARTH_1TO1_CONFIG")
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("tellus.json"));
+        .unwrap_or_else(|| PathBuf::from("1to1earth.json"));
     match std::fs::read_to_string(&path) {
         Ok(text) => match serde_json::from_str::<Value>(&text) {
             Ok(v) => {
@@ -104,7 +104,7 @@ fn load() -> Config {
                     c.cache = PathBuf::from(dir);
                 }
             }
-            Err(e) => eprintln!("[tellus] {} is not JSON ({e}); using the defaults", path.display()),
+            Err(e) => eprintln!("[1to1earth] {} is not JSON ({e}); using the defaults", path.display()),
         },
         Err(_) => {
             let text = serde_json::to_string_pretty(&json!({
@@ -125,7 +125,7 @@ fn load() -> Config {
         }
     }
     eprintln!(
-        "[tellus] 1:{} scale (true at {:.2} N), heights x{} / x{}, sea at Y {}, spawn {:.4}, {:.4}, cache {}",
+        "[1to1earth] 1:{} scale (true at {:.2} N), heights x{} / x{}, sea at Y {}, spawn {:.4}, {:.4}, cache {}",
         c.world_scale,
         c.true_scale_latitude,
         c.terrestrial_height_scale,

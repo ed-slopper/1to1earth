@@ -86,7 +86,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "mod-tellus"
+name = "mod-1to1earth"
 version = "0.1.0"
 dependencies = [
  "flate2",

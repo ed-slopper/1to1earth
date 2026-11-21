@@ -36,7 +36,7 @@ pub fn release() -> &'static str {
         releases.sort();
         let r = releases.last().copied().unwrap_or("2026-11-18.0").to_string();
         fetch::write(&file, r.as_bytes());
-        eprintln!("[tellus] Overture release {r}");
+        eprintln!("[1to1earth] Overture release {r}");
         r
     })
 }
@@ -75,7 +75,7 @@ fn open(theme: &str) -> Option<Archive> {
         _ => {
             let b = fetch::get(&url, Some((0, 16383))).ok()??;
             if b.len() < 127 || &b[..7] != b"PMTiles" || b[7] != 3 {
-                eprintln!("[tellus] {theme}.pmtiles isn't a PMTiles v3 archive");
+                eprintln!("[1to1earth] {theme}.pmtiles isn't a PMTiles v3 archive");
                 return None;
             }
             fetch::write(&head_path, &b);

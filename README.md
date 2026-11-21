@@ -1,15 +1,39 @@
-# Tellus for Horizon
+# 1to1earth
 
-A port of [Tellus](https://github.com/Yucareux/Tellus) (Yucareux, LGPL-3.0), real-Earth terrain for
-Minecraft, to a [Horizon](https://github.com/horizon-rust/horizon) native mod in Rust.
+The real Earth at 1:1 in [Horizon](https://github.com/horizon-rust/horizon), as a native mod:
+- true heights from Everest to the trenches
+- land cover and Köppen climate biomes
+- buildings and roads from Overture Maps
+- an Earth Map to pick where to go
 
-The Earth is a dimension of its own, `tellus:earth`, stacked 13 levels high so heights are true (see below). Its terrain comes
-from a registered chunk generator, and a registered biome source places its biomes. Vanilla's
-carvers and features finish it: caves, trees, grass, ores and snow.
+It's a Rust port of [Tellus](https://github.com/Yucareux/Tellus) (Yucareux, LGPL-3.0), real-Earth
+terrain for Minecraft.
+
+## Install
+
+The mod is `1to1earth.hmod` on this repository's
+[Releases](https://github.com/ed-slopper/1to1earth/releases).
+
+**In the Horizon launcher:** go to **Mods**, choose **Add from GitHub**, paste
+`https://github.com/ed-slopper/1to1earth` and accept the native-code notice. The launcher builds it
+into your game. On the command line:
+
+```
+horizon-launcher mods add-github https://github.com/ed-slopper/1to1earth --trust-native-code
+```
+
+**By hand:**
+
+1. Put `1to1earth.hmod` in your instance's `horizon-native-mods\` folder.
+2. Add the line `mod.1to1earth:true` to the instance's `horizon-mods.txt`.
+3. Build it: `horizon-launcher native-build --instance <instance> --trust-native-code`
+
+It's built for Horizon's Nov 21 2026 Nightly (`f037744`), Minecraft 26.3. Native mods run unsandboxed,
+so read the source first.
 
 ## Play
 
-- `Tellus.bat` plays the **Tellus** instance, which is Horizon with this mod built in.
+- `1to1earth.bat` plays the **1to1earth** instance. `Rebuild.bat` packages the source, installs it and builds it.
 - **The first time in a new world**, the mod writes its datapack into the world. That datapack holds
   the Earth level's noise settings, because Horizon reads worldgen data from world datapacks, not
   from a mod's own data. Save and quit, open the world again, and you land on the Earth.
@@ -25,7 +49,7 @@ carvers and features finish it: caves, trees, grass, ores and snow.
   map coordinates work too: `/earth tp 47.470256, -122.075310`.
   - `/earth where` tells you where you are.
   - `/earth leave` takes you back to the Overworld.
-- Settings are in `tellus.json`, in the instance folder (`%APPDATA%\horizon\instances\tellus`).
+- Settings are in `1to1earth.json`, in the instance folder (`%APPDATA%\horizon\instances\tellus`).
   They use Tellus's names. Change them before generating a world.
 
   | Setting | Default |
@@ -47,8 +71,8 @@ vanilla limit, as Java's height mods do (Beyond Y, World Height Limit). So the E
 of 13 levels**, the way Java's stacked-dimension mods go higher (Simply Stacked Dimensions,
 Vertically Stacked Dimensions).
 
-- **Layers:** `tellus:earth` is layer 0. Above it are `tellus:earth_up1` to `_up6`, below it
-  `tellus:earth_down1` to `_down6`. Each is a full Y -2032 to 2031 level.
+- **Layers:** `1to1earth:earth` is layer 0. Above it are `1to1earth:earth_up1` to `_up6`, below it
+  `1to1earth:earth_down1` to `_down6`. Each is a full Y -2032 to 2031 level.
 - **Heights:** layer `l` holds global Y `local + l * 2032`, so every height is true. Everest stands
   at its full 8,848 m and the Mariana Trench at its full depth. The stack holds about Y -14,200 to
   14,200.
@@ -68,7 +92,7 @@ Vertically Stacked Dimensions).
 Like WorldCraft and Tellus, buildings and roads come from [Overture Maps](https://overturemaps.org)
 (OpenStreetMap and other open data, ODbL). Only the tiles a chunk needs are range-read from
 Overture's `buildings` and `transportation` PMTiles archives, at zoom 14. They're cached in
-`tellus\cache\overture`, and a world keeps the Overture release it first read.
+`1to1earth\cache\overture`, and a world keeps the Overture release it first read.
 
 - **Buildings** stand on their real footprints at their mapped height. Where no height is mapped,
   it comes from the floor count, or a typical height for the kind of building.
@@ -78,7 +102,7 @@ Overture's `buildings` and `transportation` PMTiles archives, at zoom 14. They'r
     or by the mapped facade and roof colours where Overture has them.
 - **Roads** are painted at their class's width, from 16 m motorways to 2.5 m footpaths, with dashed
   centre lines on main roads. Paths are dirt paths and rail lines gravel beds.
-- **Settings:** `buildings` and `roads` in `tellus.json` turn them off. They're only drawn at 4 m a
+- **Settings:** `buildings` and `roads` in `1to1earth.json` turn them off. They're only drawn at 4 m a
   block or finer.
 - **Not yet:** bridges and tunnels, doors and interiors, building parts' own roof shapes, and street
   furniture.
@@ -105,13 +129,14 @@ Overture's `buildings` and `transportation` PMTiles archives, at zoom 14. They'r
 - Real-time weather and time
 - The preview and settings screens
 
-Downloads are cached in `tellus\cache` in the instance folder.
+Downloads are cached in `1to1earth\cache` in the instance folder.
 
 ## Build
 
 ```
 horizon-launcher native-lock .        # only when dependencies change; keep the game's versions
-horizon-launcher native-build . --instance tellus --trust-native-code
+cargo horizon-mod build          # packs target/horizon-mod/1to1earth.hmod
+horizon-launcher native-build . --instance <instance> --trust-native-code
 ```
 
 `Rebuild.bat` runs the build.

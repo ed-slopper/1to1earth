@@ -35,14 +35,14 @@ fn map() -> Option<&'static Map> {
                     b
                 }
                 other => {
-                    eprintln!("[tellus] the climate map couldn't be downloaded: {:?}", other.err());
+                    eprintln!("[1to1earth] the climate map couldn't be downloaded: {:?}", other.err());
                     return None;
                 }
             },
         };
         let parsed = parse(&bytes);
         if parsed.is_none() {
-            eprintln!("[tellus] the climate map is unreadable; delete {} to fetch it again", path.display());
+            eprintln!("[1to1earth] the climate map is unreadable; delete {} to fetch it again", path.display());
         }
         parsed.map(|(offsets, counts)| Map { bytes, offsets, counts })
     })
